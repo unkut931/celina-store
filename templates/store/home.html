@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}CELINA-STORE — Boutique{% endblock %}
+{% block content %}
+<section class="hero">
+  <div><p class="eyebrow">LA SÉLECTION CELINA</p><h1>Des pièces choisies<br>pour votre quotidien.</h1>
+  <p>Découvrez la collection et commandez simplement. Vous payez à la livraison.</p>
+  <a class="button" href="#catalogue">Découvrir la collection</a></div>
+  <div class="hero-art" aria-hidden="true"><span>C</span><i>CELINA<br>COLLECTION</i></div>
+</section>
+<section id="catalogue" class="section">
+  <div class="section-heading"><div><p class="eyebrow">NOTRE BOUTIQUE</p><h2>La collection</h2></div>
+    <form class="search" method="get"><label class="sr-only" for="q">Rechercher un produit</label><input id="q" name="q" value="{{ query }}" placeholder="Rechercher un produit…"><button class="button small">Rechercher</button></form>
+  </div>
+  <div class="category-row">
+    <a class="chip {% if not selected_category %}selected{% endif %}" href="{{ url_for('store.home') }}">Tout voir</a>
+    {% for category in categories %}<a class="chip {% if selected_category == category.id|string %}selected{% endif %}" href="{{ url_for('store.home', category=category.id) }}">{{ category.name }}</a>{% endfor %}
+  </div>
+  {% if products %}
+  <div class="product-grid">
+    {% for product in products %}
+    <article class="product-card">
+      <a class="product-image" href="{{ url_for('store.product', product_id=product.id) }}">
+        {% if product.image_filename %}<img src="{{ url_for('store.uploaded_image', filename=product.image_filename) }}" alt="{{ product.name }}">
+        {% else %}<span class="placeholder">C</span>{% endif %}
+        {% if product.is_demo %}<span class="demo-tag">Démo</span>{% endif %}
+      </a>
+      <div class="product-info"><p class="eyebrow">{{ product.category_name or 'Collection' }}</p>
+        <h3><a href="{{ url_for('store.product', product_id=product.id) }}">{{ product.name }}</a></h3>
+        <p class="product-desc">{{ product.description }}</p>
+        <div class="product-bottom"><strong>{{ product.sale_price|dt }} DT {% if product.compare_at_price %}<del class="old-price">{{ product.compare_at_price|dt }} DT</del>{% endif %}</strong>
+          {% if product.stock_quantity > 0 %}<span class="availability">Disponible</span>{% else %}<span class="unavailable">Épuisé</span>{% endif %}
+        </div>
+        {% if product.stock_quantity > 0 %}<form method="post" action="{{ url_for('store.add_to_cart', product_id=product.id) }}" class="add-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="quantity" value="1">
+          <button class="button full-width">Commander</button></form>{% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}<div class="empty"><h3>Aucun produit trouvé</h3><p>Essayez une autre recherche ou revenez voir la collection.</p></div>{% endif %}
+</section>
+{% if offers %}<section class="section compact-section"><p class="eyebrow">À PRIX DOUX</p><h2>Offres du moment</h2><div class="offer-row">{% for offer in offers %}<a class="chip" href="{{ url_for('store.product', product_id=offer.id) }}">{{ offer.name }} · {{ offer.sale_price|dt }} DT <del>{{ offer.compare_at_price|dt }} DT</del></a>{% endfor %}</div></section>{% endif %}
+{% if popular %}<section class="section compact-section"><p class="eyebrow">LES FAVORIS</p><h2>Produits populaires</h2><div class="offer-row">{% for item in popular %}<a class="chip" href="{{ url_for('store.product', product_id=item.id) }}">{{ item.name }} · {{ item.sale_price|dt }} DT</a>{% endfor %}</div></section>{% endif %}
+<section class="trust-row"><div><b>✓</b><span><strong>Paiement à la livraison</strong><small>Vous payez à la réception.</small></span></div><div><b>↗</b><span><strong>Livraison en Tunisie</strong><small>Frais affichés avant confirmation.</small></span></div><div><b>♡</b><span><strong>Commande simple</strong><small>Quelques informations suffisent.</small></span></div></section>
+{% endblock %}

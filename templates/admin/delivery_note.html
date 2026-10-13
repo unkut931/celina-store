@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bon livreur — {{ order.order_number }} · CELINA-STORE</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+</head>
+<body class="delivery-page">
+  <div class="delivery-actions">
+    <a href="{{ url_for('admin.orders') }}">← Retour aux commandes</a>
+    <button type="button" class="button" onclick="window.print()">Imprimer le bon</button>
+  </div>
+  <main class="delivery-note">
+    <header class="delivery-header">
+      <div>
+        <p class="delivery-kicker">CELINA-STORE · PAIEMENT À LA LIVRAISON</p>
+        <h1>Bon de livraison</h1>
+      </div>
+      <div class="delivery-number">
+        <strong>{{ order.order_number }}</strong>
+        <span>{{ order.created_at }}</span>
+      </div>
+    </header>
+
+    <section class="delivery-customer">
+      <h2>Destinataire</h2>
+      <strong>{{ order.customer_name }}</strong>
+      <span>{{ order.customer_phone }}</span>
+      <span>{{ order.delivery_address }}</span>
+      <span>{{ order.delivery_city }}</span>
+    </section>
+
+    <table class="delivery-items">
+      <thead>
+        <tr><th>Article</th><th>Qté</th><th>Prix</th><th>Total</th></tr>
+      </thead>
+      <tbody>
+        {% for line in lines %}
+        <tr>
+          <td>{{ line.product_name }}</td>
+          <td>{{ line.quantity }}</td>
+          <td>{{ line.unit_price|dt }} DT</td>
+          <td>{{ line.line_total|dt }} DT</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <section class="delivery-totals">
+      <div><span>Articles</span><strong>{{ (order.total_amount - order.delivery_fee)|dt }} DT</strong></div>
+      <div><span>Livraison</span><strong>{{ order.delivery_fee|dt }} DT</strong></div>
+      <div class="delivery-cash"><span>À ENCAISSER</span><strong>{{ order.total_amount|dt }} DT</strong></div>
+    </section>
+
+    <footer class="delivery-footer">
+      <div><span>Note du livreur</span><div class="delivery-write-line"></div></div>
+      <div class="delivery-signatures">
+        <span>Signature client</span>
+        <span>Signature livreur</span>
+      </div>
+    </footer>
+  </main>
+</body>
+</html>

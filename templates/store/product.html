@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name }} — CELINA-STORE{% endblock %}
+{% block content %}
+<p class="breadcrumbs"><a href="{{ url_for('store.home') }}">Boutique</a> / {{ product.name }}</p>
+<section class="detail-grid">
+  <div class="product-gallery">
+    <div class="detail-image">
+      {% if image_filenames %}<img id="product-main-image" src="{{ url_for('store.uploaded_image', filename=image_filenames[0]) }}" alt="{{ product.name }}">
+      {% else %}<span class="placeholder">C</span>{% endif %}
+    </div>
+    {% if image_filenames|length > 1 %}
+    <div class="product-thumbnails" aria-label="Photos du produit">
+      {% for image in image_filenames %}
+      <button type="button" class="product-thumbnail{% if loop.first %} selected{% endif %}" data-image="{{ url_for('store.uploaded_image', filename=image) }}" aria-label="Afficher la photo {{ loop.index }}" aria-pressed="{{ 'true' if loop.first else 'false' }}">
+        <img src="{{ url_for('store.uploaded_image', filename=image) }}" alt="">
+      </button>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  <div class="detail-info"><p class="eyebrow">{{ product.category_name or 'Collection CELINA' }}</p><h1>{{ product.name }}</h1>
+    <strong class="price">{{ product.sale_price|dt }} DT {% if product.compare_at_price %}<del class="old-price">{{ product.compare_at_price|dt }} DT</del>{% endif %}</strong><p>{{ product.description or 'Une pièce sélectionnée avec soin par CELINA-STORE.' }}</p>
+    {% if product.stock_quantity > 0 %}
+    <p class="availability">En stock · {{ product.stock_quantity }} disponible(s)</p>
+    <form method="post" action="{{ url_for('store.add_to_cart', product_id=product.id) }}" class="order-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="quantity">Quantité</label><input id="quantity" name="quantity" type="number" min="1" max="{{ [product.stock_quantity, 20]|min }}" value="1" required>
+      <button class="button">Ajouter au panier</button>
+    </form>
+    {% else %}<p class="unavailable">Produit momentanément indisponible.</p>{% endif %}
+    <p class="muted">Paiement à la livraison · Frais de livraison indiqués au panier.</p>
+  </div>
+</section>
+{% if image_filenames|length > 1 %}
+<script>
+  document.querySelectorAll(".product-thumbnail").forEach((thumbnail) => {
+    thumbnail.addEventListener("click", () => {
+      document.getElementById("product-main-image").src = thumbnail.dataset.image;
+      document.querySelectorAll(".product-thumbnail").forEach((item) => {
+        item.classList.toggle("selected", item === thumbnail);
+        item.setAttribute("aria-pressed", item === thumbnail ? "true" : "false");
+      });
+    });
+  });
+</script>
+{% endif %}
+{% endblock %}

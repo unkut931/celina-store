@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="CELINA-STORE — boutique en ligne">
+  <title>{% block title %}CELINA-STORE{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block page_styles %}{% endblock %}
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="{{ url_for('store.home') }}"><span class="brand-mark">C</span> CELINA-STORE</a>
+    <nav aria-label="Navigation principale">
+      <a href="{{ url_for('store.home') }}">Boutique</a>
+      <a href="{{ url_for('store.checkout') }}">Panier <span class="cart-count">{{ session.get('cart', {})|length }}</span></a>
+      <a class="admin-link" href="{{ url_for('admin.dashboard') }}">Administration</a>
+    </nav>
+  </header>
+  <main class="page">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}<div class="flash {{ category }}" role="status">{{ message }}</div>{% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="site-footer">
+    <strong>CELINA-STORE</strong>
+    <span>Paiement à la livraison · Livraison partout en Tunisie</span>
+    <span>Vos coordonnées sont utilisées uniquement pour traiter votre commande.</span>
+  </footer>
+</body>
+</html>

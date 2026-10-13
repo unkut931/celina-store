@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Votre commande — CELINA-STORE{% endblock %}
+{% block content %}
+<p class="eyebrow">FINALISER VOTRE ACHAT</p><h1>Votre commande</h1>
+{% if products %}
+<div class="checkout-grid"><section class="panel"><h2>Votre panier</h2>
+  {% for line in products %}<div class="cart-line"><div><strong>{{ line.product.name }}</strong><small>Quantité : {{ line.quantity }}</small></div><strong>{{ line.line_total|dt }} DT</strong></div>{% endfor %}
+  <div class="totals"><div><span>Sous-total</span><span>{{ subtotal|dt }} DT</span></div><div><span>Livraison</span><span>{{ delivery_fee|dt }} DT</span></div><div class="grand-total"><strong>Total à payer à la livraison</strong><strong>{{ total|dt }} DT</strong></div></div>
+</section>
+<form method="post" class="panel form-stack"><h2>Vos coordonnées</h2>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Nom complet<input name="full_name" autocomplete="name" maxlength="120" required></label>
+  <label>Téléphone<input name="phone" type="tel" autocomplete="tel" maxlength="20" placeholder="+216…" required></label>
+  <label>Adresse de livraison<textarea name="address" autocomplete="street-address" maxlength="300" required></textarea></label>
+  <label>Ville<input name="city" autocomplete="address-level2" maxlength="100" required></label>
+  <p class="muted">Le paiement se fait en espèces à la livraison.</p>
+  <button class="button full-width">Confirmer ma commande</button>
+</form></div>
+{% else %}<div class="empty"><h2>Votre panier est vide</h2><p>Parcourez nos produits pour commencer.</p><a class="button" href="{{ url_for('store.home') }}">Voir la boutique</a></div>{% endif %}
+{% endblock %}

@@ -1,0 +1,18 @@
+{% extends "admin/base.html" %}
+{% block title %}Commandes — CELINA-STORE{% endblock %}
+{% block admin_content %}
+<div class="admin-heading"><div><p class="eyebrow">VENTES EN LIGNE</p><h1>Commandes</h1><p>Confirmez une commande pour réserver son stock.</p></div></div>
+<form class="search filters"><label>Recherche<input name="q" value="{{ query }}" placeholder="N° commande, nom ou téléphone"></label><label>Statut<select name="status"><option value="">Tous les statuts</option>{% for s in statuses %}<option value="{{ s }}" {% if selected_status == s %}selected{% endif %}>{{ status_labels.get(s, s) }}</option>{% endfor %}</select></label><button class="button small">Filtrer</button></form>
+{% for o in orders %}
+<section class="panel order-panel"><div class="order-head"><div><strong>{{ o.order_number }}</strong><span class="status">{{ status_labels.get(o.status, o.status) }}</span><small>{{ o.created_at }} · {{ o.full_name }} · {{ o.phone }} · {{ o.city }}</small></div><strong>{{ o.total_amount|dt }} DT</strong></div>
+<div class="table-wrap"><table><thead><tr><th>Produit</th><th>Quantité</th><th>Prix unitaire</th><th>Total</th></tr></thead><tbody>
+{% for line in get_db_lines(o.id) %}<tr><td>{{ line.product_name }}</td><td>{{ line.quantity }}</td><td>{{ line.unit_price|dt }} DT</td><td>{{ line.line_total|dt }} DT</td></tr>{% endfor %}
+</tbody></table></div>
+<p class="muted">Adresse : {{ get_customer_address(o.customer_id) }} · Livraison : {{ o.delivery_fee|dt }} DT{% if o.status == 'Colis refusé ou retour' %} · Frais de retour : {{ o.return_fee|dt }} DT{% endif %}</p>
+{% if o.stock_deducted %}<a class="button small secondary" href="{{ url_for('admin.delivery_note', order_id=o.id) }}">Imprimer bon livreur</a>{% endif %}
+{% if transitions.get(o.status) %}<form method="post" action="{{ url_for('admin.update_order_status', order_id=o.id) }}" class="inline-form">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label>Changer le statut<select name="status" required>{% for s in transitions[o.status] %}<option value="{{ s }}">{{ status_labels.get(s, s) }}</option>{% endfor %}</select></label><button class="button small">Mettre à jour</button>
+</form>{% endif %}
+</section>
+{% else %}<div class="empty"><h2>Aucune commande</h2><p>Les nouvelles commandes client s'afficheront ici.</p></div>{% endfor %}
+{% endblock %}

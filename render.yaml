@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: celina-store
+    runtime: python
+    plan: starter
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --workers 1 --threads 4 --timeout 120 wsgi:app
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: FLASK_DEBUG
+        value: "0"
+      - key: DATABASE_PATH
+        value: /var/data/celina_store.sqlite3
+      - key: UPLOAD_FOLDER
+        value: /var/data/uploads
+    disk:
+      name: celina-store-data
+      mountPath: /var/data
+      sizeGB: 1

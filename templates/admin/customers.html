@@ -1,0 +1,10 @@
+{% extends "admin/base.html" %}
+{% block title %}Clients — CELINA-STORE{% endblock %}
+{% block admin_content %}
+<div class="admin-heading"><div><p class="eyebrow">RELATION CLIENT</p><h1>Clients</h1><p>Accès réservé à l'administration. Données affichées uniquement pour les commandes.</p></div></div>
+<form class="search"><label>Nom ou téléphone<input name="q" value="{{ query }}" placeholder="Rechercher un client"></label><button class="button small">Rechercher</button></form>
+<section class="panel"><div class="table-wrap"><table><thead><tr><th>Client</th><th>Téléphone</th><th>Ville</th><th>Commandes</th><th>Total livré</th><th>Première commande</th></tr></thead><tbody>
+{% for c in customers %}<tr><td>{{ c.full_name }}<details><summary>Historique</summary>{% for order in history[c.id] %}<small>{{ order.order_number }} · {{ order.created_at[:10] }} · {{ order.status }} · {{ order.total_amount|dt }} DT</small>{% else %}<small>Aucune commande.</small>{% endfor %}</details></td><td><a href="tel:{{ c.phone }}">{{ c.phone }}</a></td><td>{{ c.city }}</td><td>{{ c.order_count }}</td><td>{{ c.delivered_total|dt }} DT</td><td>{{ c.created_at[:10] }}</td></tr>
+{% else %}<tr><td colspan="6" class="empty-state">Aucun client enregistré.</td></tr>{% endfor %}
+</tbody></table></div></section>
+{% endblock %}

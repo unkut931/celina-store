@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block page_styles %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">{% endblock %}
+{% block content %}
+<div class="admin-layout">
+  <button class="admin-menu-toggle" type="button" aria-expanded="false" aria-controls="admin-sidebar">
+    <span aria-hidden="true">☰</span> Menu administration
+  </button>
+  <aside class="admin-sidebar" id="admin-sidebar">
+    <p class="eyebrow sidebar-caption">VOTRE BOUTIQUE</p>
+    <a class="{% if request.endpoint == 'admin.dashboard' %}active{% endif %}" href="{{ url_for('admin.dashboard') }}"><span>⌂</span> Vue d'ensemble</a>
+    <a class="{% if request.endpoint in ['admin.products','admin.new_product','admin.edit_product'] %}active{% endif %}" href="{{ url_for('admin.products') }}"><span>▦</span> Produits</a>
+    <a class="{% if request.endpoint in ['admin.categories','admin.add_category'] %}active{% endif %}" href="{{ url_for('admin.categories') }}"><span>◇</span> Catégories</a>
+    <a class="{% if request.endpoint == 'admin.stocks' %}active{% endif %}" href="{{ url_for('admin.stocks') }}"><span>▤</span> Stocks</a>
+    <a class="{% if request.endpoint in ['admin.orders','admin.update_order_status'] %}active{% endif %}" href="{{ url_for('admin.orders') }}"><span>▧</span> Commandes</a>
+    <a class="{% if request.endpoint == 'admin.customers' %}active{% endif %}" href="{{ url_for('admin.customers') }}"><span>♙</span> Clients</a>
+    <a class="{% if request.endpoint in ['admin.statistics','admin.export_statistics'] %}active{% endif %}" href="{{ url_for('admin.statistics') }}"><span>▥</span> Statistiques</a>
+    <a class="{% if request.endpoint == 'admin.settings' %}active{% endif %}" href="{{ url_for('admin.settings') }}"><span>⚙</span> Paramètres</a>
+    <div class="sidebar-shop"><span class="sidebar-shop-mark">C</span><span><strong>CELINA-STORE</strong><small>Administration</small></span></div>
+    <a class="sidebar-public-link" href="{{ url_for('store.home') }}" target="_blank" rel="noopener"><span>↗</span> Voir la boutique</a>
+    {% if session.get('admin_id') %}<form method="post" action="{{ url_for('auth.logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="logout">Déconnexion</button></form>{% endif %}
+  </aside>
+  <button class="admin-sidebar-backdrop" type="button" aria-label="Fermer le menu d'administration"></button>
+  <section class="admin-main">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}<div class="flash {{ category }}" role="status">{{ message }}</div>{% endfor %}
+    {% endwith %}
+    {% block admin_content %}{% endblock %}
+  </section>
+</div>
+<script>
+  (() => {
+    const toggle = document.querySelector(".admin-menu-toggle");
+    const closeButton = document.querySelector(".admin-sidebar-backdrop");
+    const sidebar = document.querySelector(".admin-sidebar");
+    if (!toggle || !closeButton || !sidebar) return;
+
+    const setMenuOpen = (isOpen) => {
+      document.body.classList.toggle("admin-menu-open", isOpen);
+      toggle.setAttribute("aria-expanded", String(isOpen));
+    };
+
+    toggle.addEventListener("click", () => {
+      setMenuOpen(toggle.getAttribute("aria-expanded") !== "true");
+    });
+    closeButton.addEventListener("click", () => setMenuOpen(false));
+    sidebar.addEventListener("click", (event) => {
+      if (event.target.closest("a")) setMenuOpen(false);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    });
+  })();
+</script>
+{% endblock %}

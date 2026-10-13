@@ -1,0 +1,34 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ 'Modifier' if product else 'Nouveau' }} produit — CELINA-STORE{% endblock %}
+{% block admin_content %}
+<p class="eyebrow">CATALOGUE</p><h1>{{ 'Modifier le produit' if product else 'Ajouter un produit' }}</h1>
+<form method="post" enctype="multipart/form-data" class="panel form-stack product-edit">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Nom du produit<input name="name" maxlength="160" value="{{ product.name if product else '' }}" required></label>
+  <label>Description<textarea name="description" maxlength="5000">{{ product.description if product else '' }}</textarea></label>
+  <div class="form-columns">
+    <label>Prix d'achat par unité (DT)<input name="purchase_price" type="number" min="0" step="0.001" value="{{ '%.3f'|format(product.purchase_price/1000) if product else '' }}" required></label>
+    <label>Publicité par unité (DT)<input name="advertising_cost" type="number" min="0" step="0.001" value="{{ '%.3f'|format(product.advertising_cost/1000) if product else '0.000' }}" required></label>
+    <label>Emballage par unité (DT)<input name="packaging_cost" type="number" min="0" step="0.001" value="{{ '%.3f'|format(product.packaging_cost/1000) if product else '0.000' }}" required></label>
+    <label>Prix de vente (DT)<input name="sale_price" type="number" min="0" step="0.001" value="{{ '%.3f'|format(product.sale_price/1000) if product else '' }}" required></label>
+    <label>Prix barré / promotion (DT, facultatif)<input name="compare_at_price" type="number" min="0" step="0.001" value="{{ '%.3f'|format(product.compare_at_price/1000) if product and product.compare_at_price else '' }}"></label>
+    <label>Catégorie<select name="category_id"><option value="">Sans catégorie</option>{% for c in categories %}<option value="{{ c.id }}" {% if product and product.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></label>
+    <label>Quantité en stock<input name="stock_quantity" type="number" min="0" max="1000000" value="{{ product.stock_quantity if product else 0 }}" required></label>
+    <label>Seuil d'alerte<input name="low_stock_threshold" type="number" min="0" value="{{ product.low_stock_threshold if product else 3 }}" required></label>
+  </div>
+  <label>Photos du produit (jusqu'à {{ image_limit }}, PNG, JPG, GIF ou WEBP, 5 Mo par photo)
+    <input name="images" type="file" multiple accept=".png,.jpg,.jpeg,.gif,.webp,image/png,image/jpeg,image/gif,image/webp">
+    <small>Vous pouvez sélectionner plusieurs photos en même temps. Les photos déjà ajoutées sont conservées lors d'une modification.</small>
+  </label>
+  {% if (product and product.image_filename) or extra_images %}
+  <div class="product-photo-preview">
+    <strong>Photos déjà enregistrées</strong>
+    <div>
+      {% if product.image_filename %}<img src="{{ url_for('store.uploaded_image', filename=product.image_filename) }}" alt="Photo principale de {{ product.name }}">{% endif %}
+      {% for image in extra_images %}<img src="{{ url_for('store.uploaded_image', filename=image.image_filename) }}" alt="Photo supplémentaire de {{ product.name }}">{% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  <div class="form-actions"><a class="button secondary-button" href="{{ url_for('admin.products') }}">Annuler</a><button class="button">Enregistrer</button></div>
+</form>
+{% endblock %}

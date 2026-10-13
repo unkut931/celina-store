@@ -1,0 +1,11 @@
+{% extends "admin/base.html" %}
+{% block title %}Stocks — CELINA-STORE{% endblock %}
+{% block admin_content %}
+<div class="admin-heading"><div><p class="eyebrow">INVENTAIRE</p><h1>Stocks & mouvements</h1><p>Les corrections manuelles se font sur la fiche produit et sont journalisées.</p></div><a class="button" href="{{ url_for('admin.products') }}">Gérer les produits</a></div>
+<section class="panel"><h2>État des stocks</h2><div class="table-wrap"><table><thead><tr><th>Produit</th><th>Quantité</th><th>Seuil d'alerte</th><th>État</th><th>Gestion</th></tr></thead><tbody>
+{% for p in products %}<tr><td>{{ p.name }}</td><td>{{ p.stock_quantity }}</td><td>{{ p.low_stock_threshold }}</td><td>{% if p.stock_quantity == 0 %}<span class="unavailable">Rupture</span>{% elif p.stock_quantity <= p.low_stock_threshold %}<span class="unavailable">Stock faible</span>{% else %}<span class="availability">Disponible</span>{% endif %}</td><td><a class="text-link" href="{{ url_for('admin.edit_product', product_id=p.id) }}">Ajuster</a></td></tr>{% else %}<tr><td colspan="5" class="empty-state">Aucun produit enregistré.</td></tr>{% endfor %}
+</tbody></table></div></section>
+<section class="panel"><h2>Mouvements récents</h2><div class="table-wrap"><table><thead><tr><th>Date</th><th>Produit</th><th>Type</th><th>Quantité</th><th>Motif / commande</th></tr></thead><tbody>
+{% for m in movements %}<tr><td>{{ m.created_at }}</td><td>{{ m.product_name }}</td><td>{{ m.movement_type }}</td><td>{{ m.quantity }}</td><td>{{ m.reason }}{% if m.order_number %} · {{ m.order_number }}{% endif %}</td></tr>{% else %}<tr><td colspan="5" class="empty-state">Aucun mouvement enregistré.</td></tr>{% endfor %}
+</tbody></table></div></section>
+{% endblock %}

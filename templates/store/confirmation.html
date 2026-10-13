@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Commande confirmée — CELINA-STORE{% endblock %}
+{% block content %}
+<section class="confirmation"><span class="confirm-icon">✓</span><p class="eyebrow">MERCI POUR VOTRE COMMANDE</p><h1>Votre demande est enregistrée.</h1>
+  <p>Notre équipe va vous contacter pour confirmer votre commande.</p><div class="order-number">Numéro de commande<strong>{{ order_number }}</strong></div>
+  <p>Vous paierez à la livraison. Conservez ce numéro pour le suivi.</p><a class="button" href="{{ url_for('store.home') }}">Continuer mes achats</a>
+</section>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "admin/base.html" %}
+{% block title %}Paramètres — CELINA-STORE{% endblock %}
+{% block admin_content %}
+<p class="eyebrow">CONFIGURATION DE LA BOUTIQUE</p><h1>Paramètres</h1>
+<form method="post" class="panel form-stack product-edit">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <label>Frais de livraison (DT)<input name="delivery_fee" type="number" min="0" step="0.001" value="{{ '%.3f'|format(delivery_fee/1000) }}" required></label>
+  <p class="muted">Ces frais sont affichés séparément et ajoutés au total avant la confirmation de commande.</p>
+  <label>Frais de retour par commande (DT)<input name="return_fee" type="number" min="0" step="0.001" value="{{ '%.3f'|format(return_fee/1000) }}" required></label>
+  <p class="muted">Ce coût est enregistré sur la commande lorsqu'elle passe en « Refus ou retour ». Le montant déjà enregistré ne change pas si vous modifiez ce paramètre par la suite.</p>
+  <div class="form-actions">
+    <button class="button">Enregistrer</button>
+  </div>
+</form>
+{% endblock %}

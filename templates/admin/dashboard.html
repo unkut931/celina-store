@@ -1,0 +1,28 @@
+{% extends "admin/base.html" %}
+{% block title %}Tableau de bord — CELINA-STORE{% endblock %}
+{% block admin_content %}
+<div class="admin-heading"><div><p class="eyebrow">BIENVENUE DANS VOTRE ESPACE</p><h1>Votre boutique, en un coup d’œil.</h1><p>Suivez l’activité de CELINA-STORE et gérez votre catalogue.</p></div><a class="button secondary-button" href="{{ url_for('store.home') }}" target="_blank" rel="noopener">↗ Voir la boutique</a></div>
+<div class="quick-actions"><a class="quick-action quick-action-primary" href="{{ url_for('admin.new_product') }}"><span class="quick-action-icon">＋</span><span><strong>Ajouter un produit</strong><small>Enrichissez votre catalogue</small></span><b>→</b></a><a class="quick-action" href="{{ url_for('admin.categories') }}"><span class="quick-action-icon">◇</span><span><strong>Créer une catégorie</strong><small>Organisez vos rayons</small></span><b>→</b></a><a class="quick-action" href="{{ url_for('admin.orders') }}"><span class="quick-action-icon">▧</span><span><strong>Gérer les commandes</strong><small>Suivez vos ventes</small></span><b>→</b></a></div>
+<div class="kpi-grid">
+  <article class="kpi"><span>Chiffre d'affaires livré</span><strong>{{ sales.revenue|dt }} DT</strong></article>
+  <article class="kpi"><span>Commandes totales</span><strong>{{ counts.total or 0 }}</strong></article>
+  <article class="kpi"><span>En attente</span><strong>{{ counts.pending or 0 }}</strong></article>
+  <article class="kpi"><span>Produits actifs</span><strong>{{ stock.products or 0 }}</strong></article>
+  <article class="kpi"><span>En rupture</span><strong>{{ stock.out_of_stock or 0 }}</strong></article>
+  <article class="kpi"><span>Coûts refus / retours</span><strong>{{ return_expenses|dt }} DT</strong></article>
+  <article class="kpi"><span>Marge réelle estimée</span><strong>{{ (sales.revenue-sales.cost-return_expenses)|dt }} DT</strong></article>
+</div>
+<div class="admin-grid">
+  <section class="panel"><div class="panel-title"><h2>Commandes récentes</h2><a href="{{ url_for('admin.orders') }}">Tout voir →</a></div>
+    {% if recent %}<div class="table-wrap"><table><thead><tr><th>N° commande</th><th>Client</th><th>Date</th><th>Statut</th><th>Total</th></tr></thead><tbody>
+    {% for order in recent %}<tr><td>{{ order.order_number }}</td><td>{{ order.full_name }}</td><td>{{ order.created_at[:10] }}</td><td><span class="status">{{ order.status }}</span></td><td>{{ order.total_amount|dt }} DT</td></tr>{% endfor %}
+    </tbody></table></div>{% else %}<p class="empty-state">Aucune commande pour le moment.</p>{% endif %}
+  </section>
+  <section class="panel"><h2>Alertes de stock</h2>{% if alerts %}{% for p in alerts %}<div class="alert-row"><span>{{ p.name }}</span><strong>{{ p.stock_quantity }} / seuil {{ p.low_stock_threshold }}</strong></div>{% endfor %}{% else %}<p class="empty-state">Aucune alerte de stock.</p>{% endif %}</section>
+  <section class="panel"><h2>Produits les plus vendus</h2>{% if popular %}{% for p in popular %}<div class="alert-row"><span>{{ p.product_name }}</span><strong>{{ p.units }} unité(s)</strong></div>{% endfor %}{% else %}<p class="empty-state">Les ventes livrées apparaîtront ici.</p>{% endif %}</section>
+  <section class="panel"><h2>Commandes par statut</h2>{% if statuses %}{% for s in statuses %}<div class="status-row"><span>{{ s.status }}</span><span class="bar"><i style="width: {{ [s.count * 12, 100]|min }}%"></i></span><strong>{{ s.count }}</strong></div>{% endfor %}{% else %}<p class="empty-state">Aucune donnée disponible.</p>{% endif %}</section>
+  <section class="panel"><div class="panel-title"><h2>Ventes livrées</h2><form><select name="period" aria-label="Période" onchange="this.form.submit()"><option value="daily" {% if period == 'daily' %}selected{% endif %}>Par jour</option><option value="weekly" {% if period == 'weekly' %}selected{% endif %}>Par semaine</option><option value="monthly" {% if period == 'monthly' %}selected{% endif %}>Par mois</option></select></form></div>
+    {% if sales_trend %}{% set max_revenue = sales_trend|map(attribute='revenue')|max %}{% for point in sales_trend %}<div class="status-row"><span>{{ point.period }}</span><span class="bar"><i style="width: {{ (point.revenue * 100 / max_revenue)|round|int if max_revenue else 0 }}%"></i></span><strong>{{ point.revenue|dt }} DT</strong></div>{% endfor %}{% else %}<p class="empty-state">Les ventes livrées de cette période apparaîtront ici.</p>{% endif %}
+  </section>
+</div>
+{% endblock %}

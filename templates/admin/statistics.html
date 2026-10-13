@@ -1,0 +1,19 @@
+{% extends "admin/base.html" %}
+{% block title %}Statistiques — CELINA-STORE{% endblock %}
+{% block admin_content %}
+<div class="admin-heading"><div><p class="eyebrow">ANALYSE COMMERCIALE</p><h1>Statistiques</h1><p>La marge tient compte des coûts produit et des frais des commandes retournées.</p></div><a class="button secondary-button" href="{{ url_for('admin.export_statistics') }}">Exporter CSV</a></div>
+<form class="search filters"><label>Du<input type="date" name="from" value="{{ start }}"></label><label>Au<input type="date" name="to" value="{{ end }}"></label><button class="button small">Appliquer</button></form>
+<div class="kpi-grid">
+  <article class="kpi"><span>Chiffre d'affaires livré</span><strong>{{ summary.revenue|dt }} DT</strong></article>
+  <article class="kpi"><span>Coût d'achat livré</span><strong>{{ summary.purchase_cost|dt }} DT</strong></article>
+  <article class="kpi"><span>Publicité livrée</span><strong>{{ summary.advertising_cost|dt }} DT</strong></article>
+  <article class="kpi"><span>Emballage livré</span><strong>{{ summary.packaging_cost|dt }} DT</strong></article>
+  <article class="kpi"><span>Marge après coûts produit</span><strong>{{ summary.gross_margin|dt }} DT</strong></article>
+  <article class="kpi"><span>Coûts refus / retours</span><strong>{{ return_expenses|dt }} DT</strong></article>
+  <article class="kpi"><span>Marge réelle estimée</span><strong>{{ (summary.gross_margin-return_expenses)|dt }} DT</strong></article>
+  <article class="kpi"><span>Unités livrées</span><strong>{{ summary.units or 0 }}</strong></article>
+  <article class="kpi"><span>Commandes livrées</span><strong>{{ summary.delivered_orders or 0 }}</strong></article>
+  <article class="kpi"><span>Taux annulé / refusé (global)</span><strong>{{ cancellation_rate }} %</strong></article>
+</div>
+<section class="panel"><h2>Commandes par statut</h2>{% for s in statuses %}<div class="status-row"><span>{{ s.status }}</span><span class="bar"><i style="width: {{ [s.count * 12, 100]|min }}%"></i></span><strong>{{ s.count }}</strong></div>{% else %}<p class="empty-state">Aucune commande.</p>{% endfor %}<p class="muted">Marge réelle estimée = ventes livrées − achat, publicité et emballage des produits livrés − frais des refus/retours. Pour les commandes retournées, les coûts de publicité, d'emballage et le frais de retour sont comptés ; le coût d'achat n'est pas déduit puisque le stock est réintégré. Cette estimation n'inclut pas les autres charges de l'entreprise.</p></section>
+{% endblock %}
