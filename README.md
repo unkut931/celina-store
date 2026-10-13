@@ -14,7 +14,7 @@ Première boutique monoproduit-commerçant destinée au marché tunisien. Cette 
 - Coûts publicitaires et d'emballage paramétrables par unité de produit, enregistrés en instantané lors de la commande.
 - Frais fixes de retour configurables ; les statistiques estiment la marge après coût d'achat, publicité, emballage et dépenses liées aux retours.
 - Bon livreur privé, imprimable au format A5 (une demi-page A4), avec coordonnées, articles et montant à encaisser.
-- Journal de mouvements de stock et transactions SQLite (`BEGIN IMMEDIATE`).
+- Journal de mouvements de stock et transactions SQLite en local ou PostgreSQL sur Supabase en production.
 - Tableau de bord et statistiques calculés à partir des commandes réellement livrées.
 - Export CSV compatible Excel. Les chiffres sont stockés en millimes (entiers) et affichés en DT.
 - Paramétrage des frais de livraison et commande CLI de sauvegarde SQLite.
@@ -57,16 +57,31 @@ Ouvrez `http://127.0.0.1:5000`. L'administration est à `http://127.0.0.1:5000/a
 
 Pour un usage hébergé, désactivez le mode debug, définissez une clé secrète persistante et aléatoire via l'environnement, configurez HTTPS, sauvegardez la base et placez les fichiers d'image sur un stockage adapté.
 
-## Préparer le déploiement sur Render
+## Déploiement gratuit sur Render avec Supabase
 
-Le fichier `render.yaml` configure un service web Render avec Gunicorn, HTTPS géré par Render, un contrôle de santé (`/healthz`) et un disque persistant monté sur `/var/data`. La base SQLite et les nouvelles photos produits y sont enregistrées. La boutique est publique ; les pages de gestion et les actions d'administration exigent une session administrateur. La page de connexion `/admin/login` reste naturellement accessible afin que l'administrateur puisse se connecter.
+Le Blueprint `render.yaml` configure un service web Render Free, Gunicorn, HTTPS et le contrôle de santé `/healthz`. Render Free n'a pas de disque persistant : la base PostgreSQL et les photos doivent donc rester sur Supabase. Le service utilise Supabase PostgreSQL et le bucket Supabase Storage `product-images`. Les pages de boutique et les images sont publiques ; les pages et actions d'administration restent protégées par connexion.
 
-1. Ajouter ce dossier à un dépôt Git privé et le pousser sur GitHub. Le `.gitignore` exclut les environnements locaux, la base SQLite et les photos ; ne pas ajouter ces données ou un fichier `.env` au dépôt.
-2. Dans Render, choisir **New > Blueprint**, connecter le dépôt et vérifier les paramètres et le coût du service avant de confirmer. Le Blueprint demande un plan `starter` et un disque persistant de 1 Go ; un service gratuit sans disque n'est pas adapté à cette configuration.
-3. Après le premier déploiement, ouvrir le Shell du service Render et exécuter `flask --app app create-admin admin`. Saisir un mot de passe administrateur unique lorsqu'il est demandé ; ne pas mettre le mot de passe dans le dépôt ou dans une commande enregistrée.
-4. Ouvrir l'URL publique du service. La boutique est accessible à tous ; aller sur `/admin/login` et se connecter pour gérer produits, commandes et paramètres.
+### 1. Préparer Supabase
 
-Le premier déploiement crée une base SQLite vide sur le disque persistant. Il ne transfère pas automatiquement la base ni les photos présents sur le PC. Si les données actuelles doivent être conservées, effectuer leur migration vers le disque Render avant d'utiliser la boutique en production. Effectuer et vérifier des sauvegardes régulières ; le disque persistant protège des redéploiements mais ne remplace pas une sauvegarde externe. Avec ce choix SQLite/disque, ne pas augmenter le nombre d'instances Render : le disque n'est pas partagé entre plusieurs instances.
+1. Créer un projet Supabase Free et conserver en lieu sûr le mot de passe de base de données choisi.
+2. Dans **Storage**, créer le bucket `product-images` et le déclarer public afin que les visiteurs puissent afficher les photos. Les téléversements utilisent la clé de service côté serveur ; ne jamais la placer dans le navigateur ou dans le dépôt.
+3. Dans **Project Settings > API**, relever l'URL du projet et la clé `service_role` (ou la clé secrète équivalente affichée par le tableau de bord).
+4. Dans **Project Settings > Database**, copier la chaîne de connexion PostgreSQL fournie par Supabase. Préférer le pooler de session si l'URL directe n'est pas joignable depuis Render. Remplacer le mot de passe d'exemple dans cette URL par le vrai mot de passe, en encodant les caractères spéciaux si nécessaire.
+
+### 2. Déployer le Blueprint
+
+1. Le dépôt privé `unkut931/celina-store` contient le projet. Dans Render, choisir **New > Blueprint**, connecter ce dépôt et sélectionner la branche `master`.
+2. Avant de confirmer, vérifier que le service web est bien sur le plan **Free** et qu'aucun disque ou service payant n'est ajouté.
+3. Render demandera les valeurs secrètes `DATABASE_URL`, `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY`. Les saisir dans Render uniquement. Le nom du bucket `product-images` est déjà configuré par le Blueprint. Ne pas enregistrer les valeurs secrètes dans Git ou dans une conversation.
+4. Laisser le premier déploiement terminer, puis ouvrir l'URL Render. La route `/healthz` doit répondre ; vérifier la boutique publique et que `/admin/` redirige vers la page de connexion.
+
+### 3. Créer le compte administrateur
+
+Après le déploiement, ouvrir le Shell du service sur Render et exécuter `flask --app app create-admin admin`. Saisir un mot de passe administrateur unique lorsqu'il est demandé ; ne pas le mettre dans le dépôt ou dans une commande enregistrée. Se connecter ensuite à `/admin/login`.
+
+Le schéma de base est initialisé au démarrage. Les produits, photos, clients et commandes présents sur le PC ne sont pas transférés automatiquement ; il faut décider séparément si les données existantes doivent être migrées. En particulier, ne téléverser aucune donnée personnelle de clients ou de commandes sans autorisation et procédure de migration appropriées.
+
+**Limites de l'offre gratuite :** Render peut mettre le service en veille après une période d'inactivité, avec un délai de réveil à la prochaine visite. Le stockage local Render est éphémère : conserver toutes les photos importantes dans Supabase Storage. Supabase Free applique ses propres quotas et peut mettre en pause les projets inactifs ; consulter les limites et conditions actuelles dans les tableaux de bord des deux services, et effectuer des sauvegardes régulières de la base.
 
 ## Tests
 

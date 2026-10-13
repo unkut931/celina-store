@@ -12,6 +12,7 @@ from flask import (
 )
 
 from database import get_db
+from image_storage import public_product_image_url
 from orders import place_order
 
 store_bp = Blueprint("store", __name__)
@@ -19,6 +20,9 @@ store_bp = Blueprint("store", __name__)
 
 @store_bp.get("/uploads/<path:filename>")
 def uploaded_image(filename):
+    public_url = public_product_image_url(filename)
+    if public_url:
+        return redirect(public_url)
     return send_from_directory(current_app.config["UPLOAD_FOLDER"], filename)
 
 

@@ -18,8 +18,12 @@ def create_app(test_config=None):
     app = Flask(__name__)
     app.config.from_mapping(
         SECRET_KEY=os.environ.get("FLASK_SECRET_KEY"),
+        DATABASE_URL=os.environ.get("DATABASE_URL"),
         DATABASE=os.environ.get("DATABASE_PATH", "instance/celina_store.sqlite3"),
         UPLOAD_FOLDER=os.environ.get("UPLOAD_FOLDER"),
+        SUPABASE_URL=os.environ.get("SUPABASE_URL"),
+        SUPABASE_SERVICE_ROLE_KEY=os.environ.get("SUPABASE_SERVICE_ROLE_KEY"),
+        SUPABASE_STORAGE_BUCKET=os.environ.get("SUPABASE_STORAGE_BUCKET", "product-images"),
         MAX_CONTENT_LENGTH=42 * 1024 * 1024,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
@@ -33,16 +37,27 @@ def create_app(test_config=None):
         else:
             raise RuntimeError("Configurez FLASK_SECRET_KEY dans l'environnement.")
 
-    Path(app.instance_path).mkdir(parents=True, exist_ok=True)
-    database_path = app.config["DATABASE"]
-    if not os.path.isabs(database_path):
-        app.config["DATABASE"] = str(Path(app.root_path, database_path).resolve())
-    Path(app.config["DATABASE"]).parent.mkdir(parents=True, exist_ok=True)
-    upload_folder = app.config["UPLOAD_FOLDER"] or str(Path(app.static_folder, "uploads"))
-    if not os.path.isabs(upload_folder):
-        upload_folder = str(Path(app.root_path, upload_folder).resolve())
-    app.config["UPLOAD_FOLDER"] = upload_folder
-    Path(upload_folder).mkdir(parents=True, exist_ok=True)
+    if bool(app.config["SUPABASE_URL"]) != bool(app.config["SUPABASE_SERVICE_ROLE_KEY"]):
+        raise RuntimeError(
+            "Configurez ensemble SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY."
+        )
+    if app.config["DATABASE_URL"] and not app.config["SUPABASE_URL"]:
+        raise RuntimeError(
+            "DATABASE_URL exige SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY "
+            "pour conserver les photos produits."
+        )
+    if not app.config["DATABASE_URL"]:
+        Path(app.instance_path).mkdir(parents=True, exist_ok=True)
+        database_path = app.config["DATABASE"]
+        if not os.path.isabs(database_path):
+            app.config["DATABASE"] = str(Path(app.root_path, database_path).resolve())
+        Path(app.config["DATABASE"]).parent.mkdir(parents=True, exist_ok=True)
+    if not app.config["SUPABASE_URL"]:
+        upload_folder = app.config["UPLOAD_FOLDER"] or str(Path(app.static_folder, "uploads"))
+        if not os.path.isabs(upload_folder):
+            upload_folder = str(Path(app.root_path, upload_folder).resolve())
+        app.config["UPLOAD_FOLDER"] = upload_folder
+        Path(upload_folder).mkdir(parents=True, exist_ok=True)
 
     with app.app_context():
         init_db()
@@ -116,8 +131,9 @@ def create_app(test_config=None):
         init_db()
         db = get_db()
         category = db.execute(
-            "INSERT INTO categories (name) VALUES (?)", ("Démo - Accessoires",)
-        ).lastrowid
+            "INSERT INTO categories (name) VALUES (?) RETURNING id",
+            ("Démo - Accessoires",),
+        ).fetchone()["id"]
         db.executemany(
             """INSERT INTO products
                (name, description, purchase_price, sale_price, category_id, stock_quantity,
@@ -133,6 +149,11 @@ def create_app(test_config=None):
 
     @app.cli.command("backup-db")
     def backup_db_command():
+        if app.config["DATABASE_URL"]:
+            raise click.ClickException(
+                "Cette commande sauvegarde uniquement SQLite local. "
+                "Utilisez l'export/sauvegarde Supabase pour la base hébergée."
+            )
         source = sqlite3.connect(app.config["DATABASE"])
         backup_dir = Path(app.instance_path, "backups")
         backup_dir.mkdir(parents=True, exist_ok=True)

@@ -1,5 +1,5 @@
 import csv
-import sqlite3
+import mimetypes
 from datetime import date
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from io import StringIO
@@ -9,7 +9,8 @@ from uuid import uuid4
 from flask import Blueprint, Response, abort, current_app, flash, redirect, render_template, request, url_for
 from werkzeug.utils import secure_filename
 
-from database import get_db
+from database import INTEGRITY_ERRORS, get_db, is_postgres
+from image_storage import store_product_image
 from orders import ORDER_STATUSES, TRANSITIONS, change_order_status
 from routes.auth import admin_required
 
@@ -42,7 +43,12 @@ def _save_product_image(image):
     if extension not in {"png", "jpg", "jpeg", "gif", "webp"}:
         raise ValueError("Extension d'image non autorisée.")
     filename = f"{uuid4().hex}.{extension}"
-    image.save(Path(current_app.config["UPLOAD_FOLDER"], filename))
+    content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    content = image.stream.read()
+    if current_app.config.get("SUPABASE_URL"):
+        store_product_image(filename, content, content_type)
+    else:
+        Path(current_app.config["UPLOAD_FOLDER"], filename).write_bytes(content)
     return filename
 
 
@@ -79,11 +85,24 @@ def dashboard():
     if period not in {"daily", "weekly", "monthly"}:
         period = "monthly"
     if period == "daily":
-        bucket, since = "date(o.created_at)", "-13 days"
+        bucket, since = (
+            ("to_char(date_trunc('day', o.created_at), 'YYYY-MM-DD')", "-13 days")
+            if is_postgres() else ("date(o.created_at)", "-13 days")
+        )
     elif period == "weekly":
-        bucket, since = "strftime('%Y-W%W', o.created_at)", "-77 days"
+        bucket, since = (
+            ("to_char(date_trunc('week', o.created_at), 'IYYY-\"W\"IW')", "-77 days")
+            if is_postgres() else ("strftime('%Y-W%W', o.created_at)", "-77 days")
+        )
     else:
-        bucket, since = "strftime('%Y-%m', o.created_at)", "-11 months"
+        bucket, since = (
+            ("to_char(date_trunc('month', o.created_at), 'YYYY-MM')", "-11 months")
+            if is_postgres() else ("strftime('%Y-%m', o.created_at)", "-11 months")
+        )
+    period_filter = (
+        "o.created_at >= (CURRENT_DATE + ?::interval)"
+        if is_postgres() else "o.created_at >= date('now', ?)"
+    )
     sales = db.execute(
         """SELECT COALESCE(SUM(oi.line_total), 0) AS revenue,
                   COALESCE(SUM(
@@ -99,19 +118,22 @@ def dashboard():
                        SELECT SUM((oi.advertising_cost + oi.packaging_cost) * oi.quantity)
                        FROM order_items oi WHERE oi.order_id = o.id
                    ), 0)
-               ), 0)
+               ), 0) AS amount
            FROM orders o
            WHERE o.status = 'Colis refusé ou retour'
-             AND o.created_at >= date('now', ?)""",
+             AND """ + period_filter,
         (since,),
-    ).fetchone()[0]
+    ).fetchone()["amount"]
     counts = db.execute(
-        "SELECT COUNT(*) AS total, SUM(status IN ('Nouvelle','À confirmer')) AS pending FROM orders"
+        """SELECT COUNT(*) AS total,
+                  SUM(CASE WHEN status IN ('Nouvelle','À confirmer') THEN 1 ELSE 0 END) AS pending
+           FROM orders"""
     ).fetchone()
     stock = db.execute(
         """SELECT COUNT(*) AS products,
-                  SUM(stock_quantity = 0) AS out_of_stock,
-                  SUM(stock_quantity <= low_stock_threshold AND stock_quantity > 0) AS low_stock
+                  SUM(CASE WHEN stock_quantity = 0 THEN 1 ELSE 0 END) AS out_of_stock,
+                  SUM(CASE WHEN stock_quantity <= low_stock_threshold
+                                AND stock_quantity > 0 THEN 1 ELSE 0 END) AS low_stock
            FROM products WHERE is_active = 1"""
     ).fetchone()
     recent = db.execute(
@@ -128,7 +150,7 @@ def dashboard():
     sales_trend = db.execute(
         f"""SELECT {bucket} AS period, SUM(oi.line_total) AS revenue
             FROM orders o JOIN order_items oi ON oi.order_id=o.id
-            WHERE o.status='Livrée' AND o.created_at >= date('now', ?)
+            WHERE o.status='Livrée' AND """ + period_filter + """
             GROUP BY period ORDER BY period""",
         (since,),
     ).fetchall()
@@ -154,12 +176,14 @@ def products():
         "newest": "p.created_at DESC",
         "price": "p.sale_price ASC",
         "stock": "p.stock_quantity ASC",
-        "name": "p.name COLLATE NOCASE ASC",
+        "name": "LOWER(p.name) ASC" if is_postgres() else "p.name COLLATE NOCASE ASC",
     }.get(sort, "p.created_at DESC")
     page = max(1, min(10000, request.args.get("page", 1, type=int)))
     condition = " WHERE p.name LIKE ? OR p.description LIKE ?" if query else ""
     params = (f"%{query}%", f"%{query}%") if query else ()
-    total = db.execute("SELECT COUNT(*) FROM products p" + condition, params).fetchone()[0]
+    total = db.execute(
+        "SELECT COUNT(*) AS total FROM products p" + condition, params
+    ).fetchone()["total"]
     rows = db.execute(
         """SELECT p.*, c.name AS category_name FROM products p
            LEFT JOIN categories c ON c.id = p.category_id""" + condition +
@@ -207,17 +231,15 @@ def new_product():
                 uploaded_images.append(legacy_image)
             filenames = _save_product_images(uploaded_images)
             db = get_db()
-            db.execute(
+            product_id = db.execute(
                 """INSERT INTO products
                    (name, description, image_filename, purchase_price, advertising_cost, packaging_cost,
-                    sale_price, compare_at_price, category_id,
-                    stock_quantity, low_stock_threshold)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    sale_price, compare_at_price, category_id, stock_quantity, low_stock_threshold)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id""",
                 (name, description, filenames[0] if filenames else None, purchase_price,
                  advertising_cost, packaging_cost, sale_price, compare_at_price,
                  category_id, stock, threshold),
-            )
-            product_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+            ).fetchone()["id"]
             db.executemany(
                 "INSERT INTO product_images (product_id, image_filename) VALUES (?, ?)",
                 ((product_id, filename) for filename in filenames[1:]),
@@ -330,10 +352,11 @@ def edit_product(product_id):
 @admin_bp.get("/categories")
 @admin_required
 def categories():
+    category_order = "LOWER(c.name)" if is_postgres() else "c.name COLLATE NOCASE"
     rows = get_db().execute(
         """SELECT c.id, c.name, c.created_at, COUNT(p.id) AS product_count
            FROM categories c LEFT JOIN products p ON p.category_id = c.id
-           GROUP BY c.id ORDER BY c.name COLLATE NOCASE"""
+           GROUP BY c.id ORDER BY """ + category_order
     ).fetchall()
     return render_template("admin/categories.html", categories=rows)
 
@@ -350,7 +373,7 @@ def add_category():
             db.execute("INSERT INTO categories (name) VALUES (?)", (name,))
             db.commit()
             flash("Catégorie ajoutée.", "success")
-        except sqlite3.IntegrityError:
+        except INTEGRITY_ERRORS:
             flash("Cette catégorie existe déjà.", "error")
     return redirect(url_for("admin.categories"))
 
@@ -462,9 +485,10 @@ def customers():
 @admin_required
 def stocks():
     db = get_db()
+    name_order = "LOWER(name)" if is_postgres() else "name COLLATE NOCASE"
     products = db.execute(
         """SELECT id, name, stock_quantity, low_stock_threshold, is_active
-           FROM products ORDER BY stock_quantity ASC, name COLLATE NOCASE"""
+           FROM products ORDER BY stock_quantity ASC, """ + name_order
     ).fetchall()
     movements = db.execute(
         """SELECT sm.*, p.name AS product_name, o.order_number FROM stock_movements sm
@@ -518,13 +542,15 @@ def statistics():
                 date.fromisoformat(value)
             except ValueError:
                 abort(400, description="Date invalide.")
+    order_date = "CAST(o.created_at AS DATE)" if is_postgres() else "date(o.created_at)"
+    date_parameter = "CAST(? AS DATE)" if is_postgres() else "date(?)"
     where = " WHERE o.status = 'Livrée'"
     params = []
     if start:
-        where += " AND date(o.created_at) >= date(?)"
+        where += f" AND {order_date} >= {date_parameter}"
         params.append(start)
     if end:
-        where += " AND date(o.created_at) <= date(?)"
+        where += f" AND {order_date} <= {date_parameter}"
         params.append(end)
     db = get_db()
     summary = db.execute(
@@ -545,10 +571,10 @@ def statistics():
     return_where = ["o.status = 'Colis refusé ou retour'"]
     return_params = []
     if start:
-        return_where.append("date(o.created_at) >= date(?)")
+        return_where.append(f"{order_date} >= {date_parameter}")
         return_params.append(start)
     if end:
-        return_where.append("date(o.created_at) <= date(?)")
+        return_where.append(f"{order_date} <= {date_parameter}")
         return_params.append(end)
     return_expenses = db.execute(
         """SELECT COALESCE(SUM(
@@ -556,25 +582,29 @@ def statistics():
                        SELECT SUM((oi.advertising_cost + oi.packaging_cost) * oi.quantity)
                        FROM order_items oi WHERE oi.order_id = o.id
                    ), 0)
-               ), 0)
+               ), 0) AS amount
            FROM orders o WHERE """ + " AND ".join(return_where),
         return_params,
-    ).fetchone()[0]
+    ).fetchone()["amount"]
     all_where = []
     count_params = []
+    count_date = "CAST(created_at AS DATE)" if is_postgres() else "date(created_at)"
+    count_date_parameter = "CAST(? AS DATE)" if is_postgres() else "date(?)"
     if start:
-        all_where.append("date(created_at) >= date(?)")
+        all_where.append(f"{count_date} >= {count_date_parameter}")
         count_params.append(start)
     if end:
-        all_where.append("date(created_at) <= date(?)")
+        all_where.append(f"{count_date} <= {count_date_parameter}")
         count_params.append(end)
     count_filter = " WHERE " + " AND ".join(all_where) if all_where else ""
-    all_count = db.execute("SELECT COUNT(*) FROM orders" + count_filter, count_params).fetchone()[0]
+    all_count = db.execute(
+        "SELECT COUNT(*) AS total FROM orders" + count_filter, count_params
+    ).fetchone()["total"]
     cancelled_count = db.execute(
-        "SELECT COUNT(*) FROM orders" + (count_filter + " AND " if count_filter else " WHERE ")
+        "SELECT COUNT(*) AS total FROM orders" + (count_filter + " AND " if count_filter else " WHERE ")
         + "status IN ('Annulée','Colis refusé ou retour')",
         count_params,
-    ).fetchone()[0]
+    ).fetchone()["total"]
     statuses = db.execute("SELECT status, COUNT(*) AS count FROM orders GROUP BY status").fetchall()
     return render_template(
         "admin/statistics.html", summary=summary, statuses=statuses, start=start, end=end,
@@ -604,7 +634,11 @@ def export_statistics():
     ])
     writer.writerows([
         (
-            *tuple(row)[:7], f"{row['unit_price']/1000:.3f}", f"{row['line_total']/1000:.3f}",
+            *(row[column] for column in (
+                "order_number", "created_at", "status", "full_name", "city",
+                "product_name", "quantity",
+            )),
+            f"{row['unit_price']/1000:.3f}", f"{row['line_total']/1000:.3f}",
             f"{row['purchase_price']/1000:.3f}", f"{row['advertising_cost']/1000:.3f}",
             f"{row['packaging_cost']/1000:.3f}", f"{row['return_fee']/1000:.3f}",
         )

@@ -4,7 +4,7 @@ from io import BytesIO
 import pytest
 
 from app import create_app
-from database import get_db, init_db
+from database import PostgresConnection, get_db, init_db
 from security import hash_password
 
 
@@ -50,6 +50,13 @@ def token_from(response):
     match = re.search(rb'name="csrf_token" value="([^"]+)"', response.data)
     assert match
     return match.group(1).decode()
+
+
+def test_postgres_adapter_translates_placeholders_and_case_insensitive_search():
+    assert PostgresConnection._sql(
+        "SELECT * FROM products WHERE name LIKE ? AND id = ?"
+    ) == "SELECT * FROM products WHERE name ILIKE %s AND id = %s"
+    assert PostgresConnection._sql("BEGIN IMMEDIATE") == "SELECT 1"
 
 
 def test_init_db_adds_cost_columns_to_existing_store_without_losing_products(app):
@@ -351,7 +358,7 @@ def test_admin_requires_login_and_post_requires_csrf(client):
     assert b"Identifiants incorrects" in response.data
 
 
-def test_render_environment_uses_persistent_paths_and_secure_session_cookie(
+def test_local_sqlite_environment_uses_configured_paths_and_secure_session_cookie(
     tmp_path, monkeypatch
 ):
     database_path = tmp_path / "persistent" / "celina_store.sqlite3"
@@ -419,6 +426,8 @@ def test_statistics_only_count_delivered_sales_and_export(client, app):
     export = client.get("/admin/statistiques/export.csv")
     assert export.status_code == 200
     assert "Publicité unitaire DT".encode() in export.data
+    assert b"Client Test" in export.data
+    assert b"Sac test" in export.data
 
 
 def test_return_expenses_are_snapshotted_and_deducted_from_real_margin(client, app):
